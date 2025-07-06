@@ -19,27 +19,29 @@ void correlate(int ny, int nx, const float *data, float *result) {
   // normalize input rows (center vector around origin)
   for (int j = 0; j < ny; ++j) {
     double row_sum = 0;
+    int row_start = j * nx;
     for (int i = 0; i < nx; ++i) {
-      row_sum += data[i + j * nx];
+      row_sum += data[i + row_start];
     }
     double row_mean = row_sum / nx;
 
     for (int i = 0; i < nx; ++i) {
-      normalized[i + (j * nx)] = data[i + (j * nx)] - row_mean;
+      normalized[i + row_start] = data[i + row_start] - row_mean;
     }
   }
 
   // normalize input rows (scale vector to length of 1)
   for (int j = 0; j < ny; ++j) {
     double row_square_sum = 0;
+    int row_start = j * nx;
     for (int i = 0; i < nx; ++i) {
-      double val = normalized[i + j * nx];
+      double val = normalized[i + row_start];
       row_square_sum += val * val;
     }
     double row_magnitude = sqrt(row_square_sum);
 
     for (int i = 0; i < nx; ++i) {
-      normalized[i + (j * nx)] = normalized[i + (j * nx)] / row_magnitude;
+      normalized[i + row_start] = normalized[i + row_start] / row_magnitude;
     }
   }
 
@@ -48,13 +50,16 @@ void correlate(int ny, int nx, const float *data, float *result) {
   // this is taking the dot product of each pairwise row (which gives the
   // correlation) first, iterate over pairs of rows (upper triangle)
   for (int i = 0; i < ny; ++i) {
+    int row_i_start = i * nx;
+    int i_ny = i * ny;
     for (int j = i; j < ny; ++j) {
+      int row_j_start = j * nx;
       double correlation = 0;
       // second, iterate through rows and sum products of elements (dot product)
       for (int k = 0; k < nx; ++k) {
-        correlation += normalized[i * nx + k] * normalized[j * nx + k];
+        correlation += normalized[row_i_start + k] * normalized[row_j_start + k];
       }
-      result[j + i * ny] = correlation;
+      result[j + i_ny] = correlation;
     }
   }
 
