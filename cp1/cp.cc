@@ -58,4 +58,6 @@ void correlate(int ny, int nx, const float *data, float *result) {
       result[j + i * ny] = correlation;
     }
   }
+
+  free(normalized);
 }
