@@ -12,11 +12,11 @@ This is the function you need to implement. Quick reference:
 void correlate(int ny, int nx, const float *data, float *result) {
   int data_size = nx * ny;
 
-  double *normalized = new double[data_size];
+  double *normalized = (double *)malloc(data_size * sizeof(double));
   for (int i = 0; i < data_size; ++i) {
     normalized[i] = 0;
   }
-  
+
   // normalize input rows (center vector around origin)
   for (int j = 0; j < ny; ++j) {
     double row_sum = 0;
@@ -26,7 +26,7 @@ void correlate(int ny, int nx, const float *data, float *result) {
     double row_mean = row_sum / nx;
 
     for (int i = 0; i < nx; ++i) {
-      normalized[i + (j * nx)] = data[i + (j * nx)] - row_mean ;
+      normalized[i + (j * nx)] = data[i + (j * nx)] - row_mean;
     }
   }
 
@@ -46,8 +46,8 @@ void correlate(int ny, int nx, const float *data, float *result) {
 
   // calculate upper triangle of matrix product (normalized matrix) x
   // (transpose)
-  // this is taking the dot product of each pairwise row (which gives the correlation)
-  // first, iterate over pairs of rows (upper triangle)
+  // this is taking the dot product of each pairwise row (which gives the
+  // correlation) first, iterate over pairs of rows (upper triangle)
   for (int i = 0; i < ny; ++i) {
     for (int j = i; j < ny; ++j) {
       double correlation = 0;
@@ -55,7 +55,7 @@ void correlate(int ny, int nx, const float *data, float *result) {
       for (int k = 0; k < nx; ++k) {
         correlation += normalized[i * nx + k] * normalized[j * nx + k];
       }
-      result[j + i*ny] = correlation;
+      result[j + i * ny] = correlation;
     }
   }
 }
