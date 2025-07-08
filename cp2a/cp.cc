@@ -18,7 +18,7 @@ This is the function you need to implement. Quick reference:
 - only parts with 0 <= j <= i < ny need to be filled
 */
 void correlate(int ny, int nx, const float *data, float *result) {
-  int stride_length = 16;
+  int stride_length = 8;
 
   int data_size = nx * ny;
 
@@ -71,14 +71,7 @@ void correlate(int ny, int nx, const float *data, float *result) {
       double correlation5 = 0;
       double correlation6 = 0;
       double correlation7 = 0;
-      double correlation8= 0;
-      double correlation9 = 0;
-      double correlation10 = 0;
-      double correlation11 = 0;
-      double correlation12 = 0;
-      double correlation13 = 0;
-      double correlation14 = 0;
-      double correlation15 = 0;
+
       for (int k = 0; k < nx / stride_length * stride_length;
            k += stride_length) {
         correlation +=
@@ -97,22 +90,6 @@ void correlate(int ny, int nx, const float *data, float *result) {
             normalized[row_i_start + k + 6] * normalized[row_j_start + k + 6];
         correlation7 +=
             normalized[row_i_start + k + 7] * normalized[row_j_start + k + 7];
-        correlation8 +=
-            normalized[row_i_start + k + 8] * normalized[row_j_start + k + 8];
-        correlation9  +=
-            normalized[row_i_start + k + 9] * normalized[row_j_start + k + 9];
-        correlation10  +=
-            normalized[row_i_start + k + 10] * normalized[row_j_start + k + 10];
-        correlation11  +=
-            normalized[row_i_start + k + 11] * normalized[row_j_start + k + 11];
-        correlation12  +=
-            normalized[row_i_start + k + 12] * normalized[row_j_start + k + 12];
-        correlation13  +=
-            normalized[row_i_start + k + 13] * normalized[row_j_start + k + 13];
-        correlation14  +=
-            normalized[row_i_start + k + 14] * normalized[row_j_start + k + 14];
-        correlation15  +=
-            normalized[row_i_start + k + 15] * normalized[row_j_start + k + 15];
       }
 
       for (int k = nx / stride_length * stride_length; k < nx; k++) {
@@ -122,9 +99,7 @@ void correlate(int ny, int nx, const float *data, float *result) {
 
       result[j + i_ny] = correlation + correlation1 + correlation2 +
                          correlation3 + correlation4 + correlation5 +
-                         correlation6 + correlation7 + correlation8+ correlation9 + correlation10 +
-                         correlation11 + correlation12 + correlation13 +
-                         correlation14 + correlation15;
+                         correlation6 + correlation7;
     }
   }
 
