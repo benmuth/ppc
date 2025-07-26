@@ -52,7 +52,7 @@ void correlate(int ny, int nx, const float *data, float *result) {
   // (transpose)
   // this is taking the dot product of each pairwise row (which gives the
   // correlation) first, iterate over pairs of rows (upper triangle)
-  #pragma omp parallel for
+  #pragma omp parallel for schedule(static, 2)
   for (int i = 0; i < ny; ++i) {
     for (int j = i; j < ny; ++j) {
       double correlation = 0;
