@@ -1,0 +1,2 @@
+timeout 32.5
+random 4000 1000 5

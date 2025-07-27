@@ -2,13 +2,6 @@
 #include <cstdlib>
 #include <cstring>
 
-// operations
-// subtract mean from each row
-//
-
-// x = [0, 1, 2, 3]
-//
-
 /*
 This is the function you need to implement. Quick reference:
 - input rows: 0 <= y < ny
