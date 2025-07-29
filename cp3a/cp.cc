@@ -15,18 +15,15 @@ This is the function you need to implement. Quick reference:
 */
 void correlate(int ny, int nx, const float *data, float *result) {
   constexpr int elems_per_vec = 4;
+  constexpr int stride = 4;
 
   int elems_per_padded_row =
       (nx + elems_per_vec - 1) / elems_per_vec * elems_per_vec;
   int vectors_per_padded_row = elems_per_padded_row / elems_per_vec;
-  // int data_size = elems_per_padded_row * ny;
 
   double4_t zero_vec = {0.0, 0.0, 0.0, 0.0};
   std::vector<double4_t> vnormalized(vectors_per_padded_row * ny, zero_vec);
   std::vector<double4_t> vdata(vectors_per_padded_row * ny, zero_vec);
-
-  // for (int j = 0; j < ny; ++j) {
-  // }
 
   // normalize input rows (center vector of length 1 around origin)
   #pragma omp parallel for
@@ -84,25 +81,39 @@ void correlate(int ny, int nx, const float *data, float *result) {
   // calculate upper triangle of matrix product (normalized matrix) x
   // (transpose)
   // this is taking the dot product of each pairwise row (which gives the
-  // correlation) first, iterate over pairs of rows (upper triangle)
+  // correlation)
+  // first, iterate over pairs of rows (upper triangle)
   #pragma omp parallel for schedule(dynamic, 1)
   for (int i = 0; i < ny; ++i) {
     int row_i_start = i * vectors_per_padded_row;
     int i_ny = i * ny;
-    for (int j = i; j < ny; ++j) {
-      int row_j_start = j * vectors_per_padded_row;
-      // iterate through the rows and sum the products of elements (dot product)
-      double4_t correlation = {0.0, 0.0, 0.0, 0.0};
 
-      // std::cerr << "row i start " << row_i_start << std::endl;
-      // std::cerr << "row j start " << row_j_start << std::endl;
+    // Process stride rows at a time
+    for (int j = i; j < ny; j += stride) {
+      double4_t correlation0 = {0.0, 0.0, 0.0, 0.0};
+      double4_t correlation1 = {0.0, 0.0, 0.0, 0.0};
+      double4_t correlation2 = {0.0, 0.0, 0.0, 0.0};
+      double4_t correlation3 = {0.0, 0.0, 0.0, 0.0};
+
+      int row_j0_start = j * vectors_per_padded_row;
+      int row_j1_start = (j + 1 < ny) ? (j + 1) * vectors_per_padded_row : 0;
+      int row_j2_start = (j + 2 < ny) ? (j + 2) * vectors_per_padded_row : 0;
+      int row_j3_start = (j + 3 < ny) ? (j + 3) * vectors_per_padded_row : 0;
+
+      // Compute dot products for up to stride rows simultaneously
       for (int k = 0; k < vectors_per_padded_row; ++k) {
-        correlation +=
-            vnormalized[row_i_start + k] * vnormalized[row_j_start + k];
+        double4_t row_i_vec = vnormalized[row_i_start + k];
+        correlation0 += row_i_vec * vnormalized[row_j0_start + k];
+        if (j + 1 < ny) correlation1 += row_i_vec * vnormalized[row_j1_start + k];
+        if (j + 2 < ny) correlation2 += row_i_vec * vnormalized[row_j2_start + k];
+        if (j + 3 < ny) correlation3 += row_i_vec * vnormalized[row_j3_start + k];
       }
 
-      result[j + i_ny] =
-          correlation[0] + correlation[1] + correlation[2] + correlation[3];
+      // Store results
+      result[j + i_ny] = correlation0[0] + correlation0[1] + correlation0[2] + correlation0[3];
+      if (j + 1 < ny) result[(j + 1) + i_ny] = correlation1[0] + correlation1[1] + correlation1[2] + correlation1[3];
+      if (j + 2 < ny) result[(j + 2) + i_ny] = correlation2[0] + correlation2[1] + correlation2[2] + correlation2[3];
+      if (j + 3 < ny) result[(j + 3) + i_ny] = correlation3[0] + correlation3[1] + correlation3[2] + correlation3[3];
     }
   }
 }
