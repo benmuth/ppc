@@ -14,38 +14,50 @@
 
 struct precomp_values {
   double *areas;
-  double *color_squared_sum;
+  double *component_squared_areas;
 };
 
 size_t index(int c, int x, int y, int nx) { return c + 3 * x + 3 * nx * y; }
 
-precomp_values make_summed_area(int ny, int nx, const float *data) {
+precomp_values *make_summed_area(int ny, int nx, const float *data) {
   double *areas = (double *)calloc(nx * ny * 3, sizeof(double));
-  double *color_squared_sum = (double *)calloc(nx * ny * 3, sizeof(double));
+  double *component_squared_areas =
+      (double *)calloc(nx * ny * 3, sizeof(double));
+
+  precomp_values *pv = (precomp_values *)calloc(1, sizeof(precomp_values));
 
   for (int y = 0; y < ny; y++) {
     for (int x = 0; x < nx; x++) {
       for (int c = 0; c < 3; c++) {
         int i = index(c, x, y, nx);
-
-        areas[i] = data[index(c, x, y, nx)];
+        float pixel_color = data[index(c, x, y, nx)];
+        areas[i] = pixel_color;
+        component_squared_areas[i] = pixel_color * pixel_color;
 
         if (x - 1 >= 0) {
           areas[i] += areas[index(c, x - 1, y, nx)];
+          component_squared_areas[i] +=
+              component_squared_areas[index(c, x - 1, y, nx)];
         }
 
         if (y - 1 >= 0) {
           areas[i] += areas[index(c, x, y - 1, nx)];
+          component_squared_areas[i] +=
+              component_squared_areas[index(c, x, y - 1, nx)];
         }
 
         if (x - 1 >= 0 && y - 1 >= 0) {
           areas[i] -= areas[index(c, x - 1, y - 1, nx)];
+          component_squared_areas[i] -=
+              component_squared_areas[index(c, x - 1, y - 1, nx)];
         }
       }
     }
   }
 
-  return precomp_values{.areas = areas, .color_squared_sum = color_squared_sum};
+  pv->areas = areas;
+  pv->component_squared_areas = component_squared_areas;
+  return pv;
 }
 
 struct Result {
@@ -68,17 +80,28 @@ struct Rectangle {
   int y1;
   float color[3];
 };
-
+// 1. The formula on lines 88-90 is wrong. The correct formula for sum from (x,
+// y) to (x+width-1, y+height-1) is:
+//   S[x+width-1, y+height-1] - S[x-1, y+height-1] - S[x+width-1, y-1] + S[x-1,
+//   y-1]
+//   1. But line 88 uses (x + width-1, y) instead of (x-1, y+height-1).
 double get_summed_area(double *areas, int x, int y, int c, int width,
                        int height, int nx) {
-  double sum = areas[index(c, x + width, y + height, nx)];
-  sum -= areas[index(c, x + width, y, nx)];
-  sum -= areas[index(c, x, y + height, nx)];
-  sum += areas[index(c, x, y, nx)];
+
+  int x1 = x + width - 1;
+  int y1 = y + height - 1;
+  double sum = areas[index(c, x1, y1, nx)];
+  if (y > 0)
+    sum -= areas[index(c, x1, y - 1, nx)];
+  if (x > 0)
+    sum -= areas[index(c, x - 1, y1, nx)];
+  if (x > 0 && y > 0)
+    sum += areas[index(c, x - 1, y - 1, nx)];
   return sum;
 }
 
-float error(const float *data, int nx, int ny, Result r);
+float error(const float *data, int c, int width, int height, int nx,
+            double summed_area, Result *r);
 
 /*
 This is the function you need to implement. Quick reference:
@@ -88,77 +111,68 @@ This is the function you need to implement. Quick reference:
 - input: data[c + 3 * x + 3 * nx * y]
 */
 Result segment(int ny, int nx, const float *data) {
+  std::cout << 1 << std::endl;
   Result result{0, 0, 0, 0, {0, 0, 0}, {0, 0, 0}};
 
   // precomputation
-  Rectangle *rects = (Rectangle *)malloc(nx * ny * sizeof(Rectangle));
-  for (int y = 0; y < ny; ++y) {
-    float color[3] = {0.0, 0.0, 0.0};
-    for (int x = 0; x < nx; ++x) {
-      // indices of the rectangle and the rectangle above
-      int i = (y * nx) + x;
-      int prev_row_i = ((y - 1) * nx) + x;
-
-      // calculate the 2D prefix sum of color for each rectangle (easy to find
-      // average color for a rectangle later)
-
-      // 00 01 02
-      // 10 11 12
-
-      // sum(11) = 11 + 10 + 01 - 00
-      if (prev_row_i >= 0 && i > 0) {
-        for (int c = 0; c < 3; c++) {
-          color[c] +=
-              rects[prev_row_i].color[c] + data[c + (3 * x) + ((3 * nx) * y)];
-        }
-      } else {
-        for (int c = 0; c < 3; ++c) {
-          color[c] += data[c + (3 * x) + ((3 * nx) * y)];
-        }
-      }
-      // float prev_color[3];
-      // prev_color[0] = rects[i - 1].color[0];
-      // prev_color[1] = rects[i - 1].color[1];
-      // prev_color[2] = rects[i - 1].color[2];
-      // std::cout << color[0] << std::endl;
-      rects[i] = Rectangle{.x0 = 0,
-                           .y0 = 0,
-                           .x1 = x,
-                           .y1 = y,
-                           .color = {color[0], color[1], color[2]}};
-    }
-  }
-
-  // // print precomputed rectangles
-  // std::cout << std::fixed << std::setprecision(2);
-  // for (int i = 0; i < nx * ny; ++i) {
-  //   std::cout << "[" << rects[i].x0 << "," << rects[i].y0 << "," <<
-  //   rects[i].x1
-  //             << "," << rects[i].y1 << "] ";
-
-  //   for (int c = 0; c < 3; ++c) {
-  //     std::cout << rects[i].color[c] << " ";
-  //   }
-  //   std::cout << " | ";
-
-  //   if ((i + 1) % nx == 0) {
-  //     std::cout << std::endl;
-  //   }
-  // }
+  precomp_values *pv = make_summed_area(ny, nx, data);
 
   float min_error = 1e10;
-  // find best rectangle
-  // try every rectangle?
+
+  std::cout << 2 << std::endl;
   for (int y0 = 0; y0 < ny; ++y0) {
     for (int x0 = 0; x0 < nx; ++x0) {
-      for (int y1 = y0; y1 < ny; ++y1) {
-        for (int x1 = x0; x1 < nx; ++x1) {
-          float err = 0.0;
+      for (int y1 = y0 + 1; y1 <= ny; ++y1) {
+        for (int x1 = x0 + 1; x1 <= nx; ++x1) {
+          std::cout << 3 << std::endl;
+          int width = x1 - x0;
+          int height = y1 - y0;
+          if (width == nx && height == ny)
+            continue;
 
-          Result candidate = get_summed_area(precomp_values->areas, int x, int y, int c,
-                                             int width, int height, int nx);
-          err += error(data, nx, ny, &candidate);
+          Result candidate = {
+              .y0 = y0,
+              .x0 = x0,
+              .y1 = y1,
+              .x1 = x1,
+              .outer = {0, 0, 0},
+              .inner = {0, 0, 0},
+          };
+          float err = 0.0;
+          for (int c = 0; c < 3; ++c) {
+            std::cout << 4 << std::endl;
+            double total = get_summed_area(pv->areas, 0, 0, c, nx, ny, nx);
+            double summed_area =
+                get_summed_area(pv->areas, x0, y0, c, x1 - x0, y1 - y0, nx);
+
+            double total_squared_components = get_summed_area(
+                pv->component_squared_areas, 0, 0, c, nx, ny, nx);
+            double summed_component_squared_area = get_summed_area(
+                pv->component_squared_areas, x0, y0, c, x1 - x0, y1 - y0, nx);
+
+            float inner_color = summed_area / (width * height);
+            float outer_color =
+                (total - summed_area) / ((nx * ny) - (width * height));
+
+            candidate.inner[c] = inner_color;
+            candidate.outer[c] = outer_color;
+
+            // SSE = n * p^2 - 2(A)p + (a_i)^2
+
+            double err_inner = (width * height) * (inner_color * inner_color) -
+                               (2 * summed_area * inner_color) +
+                               summed_component_squared_area;
+            double err_outer =
+                ((nx * ny) - (width * height)) * (outer_color * outer_color) -
+                (2 * (total - summed_area) * outer_color) +
+                (total_squared_components - summed_component_squared_area);
+
+            err += err_inner + err_outer;
+          }
+
+          std::cout << "error " << err << "min error" << min_error << std::endl;
           if (err < min_error) {
+            std::cout << "found new min! " << err << std::endl;
             result = candidate;
             min_error = err;
           }
@@ -172,45 +186,22 @@ Result segment(int ny, int nx, const float *data) {
   return result;
 }
 
-float error(const float *data, int nx, int ny, Result *r) {
-  // error
-  // float outside_color[3] = {150, 125, 112};
-  // float inside_color[3] = {112, 125, 150};
-  // Rectangle rect = {
-  //     .x0 = 0, .y0 = 0, .x1 = 25, .y1 = 25, .color = {100, 100, 100}};
+// float error(const float *data, int c, int width, int height, int nx,
+//             precomp_values pv, Result *r) {
+//   float sum_squared_error = 0.0;
 
-  float sum_squared_error = 0.0;
+//   // SSE = p^2 - 2(A)p + (a_i)^2
+//   // SSE = (p^2)
 
-  // SSE = n * p - 2(a_i)p + (a_i)^2
+//   // n
+//   // int num_pixels = width * height;
 
-  // for (int x = 0; x < nx; ++x) {
-  //   for (int y = 0; y < ny; ++y) {
-  //     for (int c = 0; c < 3; ++c) {
-  //       float error = 0.0;
-  //       float point_color = data[c + 3 * x + 3 * nx * y];
+//   // double a_i = pv.areas[index(c, r->x0, r->y0, nx)];
+//   double sum_a_i =
+//       get_summed_area(pv.areas, r->x0, r->y0, c, width, height, nx);
+//   double sum_a_i2 = get_summed_area(pv.component_squared_areas, r->x0, r->y0,
+//   c,
+//                                     width, height, nx);
 
-  //       // outside
-  //       if (x < r->x0 || x > (r->x1 - 1) || y < r->y0 || (y > r->y1 - 1)) {
-  //         error = r->outer[c] - point_color;
-  //       } else { // inside
-  //         error = r->inner[c] - point_color;
-  //       }
-  //       sum_squared_error += error * error;
-  //     }
-  //   }
-  // }
-
-  return sum_squared_error;
-}
-
-// Rectangle createRect(Rectangle *precomputed_rects, int size, Rectangle
-// want_rect) {
-//   Rectangle upper_left;
-//   Rectangle lower_left;
-//   Rectangle upper_right;
-//   Rectangle lower_right;
-
-//   for (int i = 0; i < size; ++i) {
-
-//   }
+//   return sum_squared_error;
 // }
