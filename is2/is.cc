@@ -100,7 +100,6 @@ double get_summed_area(double *areas, int x, int y, int c, int width,
   return sum;
 }
 
-
 /*
 This is the function you need to implement. Quick reference:
 - x coordinates: 0 <= x < nx
@@ -109,7 +108,6 @@ This is the function you need to implement. Quick reference:
 - input: data[c + 3 * x + 3 * nx * y]
 */
 Result segment(int ny, int nx, const float *data) {
-  // std::cout << 1 << std::endl;
   Result result{0, 0, 0, 0, {0, 0, 0}, {0, 0, 0}};
 
   // precomputation
@@ -117,12 +115,10 @@ Result segment(int ny, int nx, const float *data) {
 
   double min_error = 1e10;
 
-  // std::cout << 2 << std::endl;
   for (int y0 = 0; y0 < ny; ++y0) {
     for (int x0 = 0; x0 < nx; ++x0) {
       for (int y1 = y0 + 1; y1 <= ny; ++y1) {
         for (int x1 = x0 + 1; x1 <= nx; ++x1) {
-          // std::cout << 3 << std::endl;
           int width = x1 - x0;
           int height = y1 - y0;
 
@@ -136,7 +132,6 @@ Result segment(int ny, int nx, const float *data) {
           };
           double err = 0.0;
           for (int c = 0; c < 3; ++c) {
-            // std::cout << 4 << std::endl;
             double total = get_summed_area(pv->areas, 0, 0, c, nx, ny, nx);
             double summed_area =
                 get_summed_area(pv->areas, x0, y0, c, x1 - x0, y1 - y0, nx);
@@ -166,9 +161,7 @@ Result segment(int ny, int nx, const float *data) {
             err += err_inner + err_outer;
           }
 
-          std::cout << "error " << err << " min error " << min_error << std::endl;
           if (err < min_error) {
-            std::cout << "found new min! " << err << std::endl;
             result = candidate;
             min_error = err;
           }
@@ -177,7 +170,9 @@ Result segment(int ny, int nx, const float *data) {
     }
   }
 
-  std::cout << std::endl;
+  free(pv->areas);
+  free(pv->component_squared_areas);
+  free(pv);
 
   return result;
 }
